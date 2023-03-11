@@ -1,3 +1,17 @@
+/*
+    M142 Final Project - The Heat Equation
+    Coding by Egan Bosch, in collaboration with Isaac Forrest and Edwin Kuffner
+    --------------------------------------
+    In this program, we use the differential equation for heat to simulate
+    the transfer of heat through a 2d plate of material. We include tools
+    for the user to add and remove heat, as well as to break and build with
+    highly and lowly thermally conductive material for the sake observing
+    how heat moves through different constructs.
+*/
+
+let GRID_SIZE = 100
+
+// Utility Functions
 function* range(...args) {
     let start, end, step;
     if (args.length === 0) return;
@@ -8,12 +22,9 @@ function* range(...args) {
     for (let i = start; i < end; i += step) yield i;
 }
 
-let subtract_list = (a, b) => a.map((a, i) => a - b[i]);
 let last_of = (a) => a[a.length - 1];
 let loc = (ix, iy) => `${ix},${iy}`
 
-
-let GRID_SIZE = 100
 let h = 600 / GRID_SIZE
 let speed = 3;
 let tempMap = new Map()
@@ -21,10 +32,10 @@ let tsize = 20;
 
 let getTemp = (ix, iy) => {
     if (tempMap.has(loc(ix, iy))) return tempMap.get(loc(ix, iy))[0]
-    if (tempMap.has(loc(ix + 1, iy))) return tempMap.get(loc(ix + 1, iy))[0]
-    if (tempMap.has(loc(ix - 1, iy))) return tempMap.get(loc(ix - 1, iy))[0]
-    if (tempMap.has(loc(ix, iy + 1))) return tempMap.get(loc(ix, iy + 1))[0]
-    if (tempMap.has(loc(ix, iy - 1))) return tempMap.get(loc(ix, iy - 1))[0]
+    if (tempMap.has(loc(ix + 1, iy))) return tempMap.get(loc(ix + 1, iy))[0] * 0.992
+    if (tempMap.has(loc(ix - 1, iy))) return tempMap.get(loc(ix - 1, iy))[0] * 0.992
+    if (tempMap.has(loc(ix, iy + 1))) return tempMap.get(loc(ix, iy + 1))[0] * 0.992
+    if (tempMap.has(loc(ix, iy - 1))) return tempMap.get(loc(ix, iy - 1))[0] * 0.992
 }
 
 let setTemp = (ix, iy, t) => {
@@ -32,12 +43,9 @@ let setTemp = (ix, iy, t) => {
     if (tempMap.has(loctext)) tempMap.set(loctext, [t, tempMap.get(loctext)[1]])
 }
 
+//Barebones UI
 let buttons = []
-
-let addButton = (x, y, text, colorlambda, clicklambda) => {
-    buttons.push([x, y, text, colorlambda, clicklambda]);
-}
-
+let addButton = (x, y, text, colorlambda, clicklambda) => buttons.push([x, y, text, colorlambda, clicklambda]);
 
 let BUILDING = false
 let HEATING = true
@@ -45,17 +53,6 @@ let MATERIAL = 0
 addButton(280, 30, "Build or Break", () => {return [BUILDING ? 150 : 255, BUILDING ? 255 : 150, 200]}, () => {BUILDING = !BUILDING})
 addButton(100, 30, "Heat or Cool", () => {return [HEATING ? 150 : 255, HEATING ? 255 : 150, 200]}, () => {HEATING = !HEATING})
 addButton(460, 30, "High or Low Conductivity", () => {return [MATERIAL ? 150 : 255, MATERIAL ? 255 : 150, 200]}, () => {MATERIAL = 1 - MATERIAL})
-
-
-let doubleDerivative = (ix, iy) => {
-    let [ddx, ddy] = [0, 0];
-    let tempHere = getTemp(ix, iy)
-    
-        ddx = (getTemp(ix - 1, iy) - 2 * tempHere + getTemp(ix + 1, iy)) / (h * h)
-        ddy = (getTemp(ix, iy - 1) - 2 * tempHere + getTemp(ix, iy + 1)) / (h * h)
-
-    return [ddx, ddy]
-}
 
 function mouseReleased() {
     for (let button of buttons) {
@@ -66,11 +63,21 @@ function mouseReleased() {
     }
 }
 
+// Uses the numerical method: f''(x) = (f(x - h) - 2 * f(x) + f(x + h)) / h^2 + O(h^2)
+// This is necessary to calculate the heat equation: df/dt = d^2f/dx^2 + d^2f/dy^2
+let doubleDerivative = (ix, iy) => {
+    let [ddx, ddy] = [0, 0];
+    let tempHere = getTemp(ix, iy)
+    
+        ddx = (getTemp(ix - 1, iy) - 2 * tempHere + getTemp(ix + 1, iy)) / (h * h)
+        ddy = (getTemp(ix, iy - 1) - 2 * tempHere + getTemp(ix, iy + 1)) / (h * h)
+
+    return [ddx, ddy]
+}
 
 
 function setup() {
     createCanvas(800, 800);
-    standardNorm = () => randomGaussian(0, 1);
     noStroke()
 
     for (let ix of range(GRID_SIZE)) {
@@ -81,6 +88,8 @@ function setup() {
 }
 
 var draw = function() {
+
+    // Render the buttons
     background(150, 200, 255)
     textSize(tsize)
     for (let button of buttons) {
@@ -92,6 +101,7 @@ var draw = function() {
         text(button_text, x + 10, y + tsize)
     }
 
+    // Functionality for heating, cooling, building, and breaking
     if (mouseIsPressed && mouseButton === LEFT) {
         let [ix, iy] = [floor((mouseX - 100) / h), floor((mouseY - 100) / h)]
         for (let dx of range(-3, 3)) {
@@ -116,7 +126,7 @@ var draw = function() {
         }
     }
 
-    // DO TEMP SHIFTING
+    // Do the temperature shifting, according to the heat equation
     for (let _ of range(speed)) {
         let shifts = new Map();
         for (let ix of range(GRID_SIZE)) {
@@ -131,7 +141,7 @@ var draw = function() {
     }
     
 
-    // DRAW
+    // Draw the particles to the screen
     for (let ix of range(GRID_SIZE)) {
         for (let iy of range(GRID_SIZE)) {
             if (tempMap.has(loc(ix, iy))) {
